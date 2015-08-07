@@ -1,0 +1,208 @@
+<apex:page standardcontroller="Lead"   docType="html-5.0" title="Bulk Lead Processor" >
+<apex:includeScript value="{!URLFOR($Resource.JSforce,'jsforce.js')}" />
+
+   <style>
+    /* This is for the full screen DIV */
+    .popupBackground {
+        /* Background color */
+        background-color:black;
+        opacity: 0.20;
+        filter: alpha(opacity = 20);
+    
+        /* Dimensions */
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        z-index: 998;
+        position: absolute;
+        
+        /* Mouse */
+        cursor:wait;
+    }
+ 
+    /* This is for the message DIV */
+    .PopupPanel {
+        /* Background color */
+        border: solid 2px blue;
+        background-color: white;
+ 
+        /* Dimensions */
+        left: 50%;
+        width: 200px;
+        margin-left: -100px;
+        top: 50%;
+        height: 50px;
+        margin-top: -25px;
+        z-index: 999;
+        position: fixed;
+        
+        /* Mouse */
+        cursor:pointer;
+    }
+</style>
+    <script>
+      
+        var errmsg ='';
+        var fileloaded=false;
+        var outfile;
+        var conn;
+        var job;
+        var MAXSIZE=10000;
+        window.onload = function() {
+
+        
+        
+        if (window.File && window.FileList && window.FileReader) {
+                conn = new jsforce.Connection({ 
+                    accessToken: '{!$Api.Session_Id}'
+                    ,proxyUrl: '/services/proxy'
+                    //,logLevel: "DEBUG"
+                });
+                job = conn.bulk.createJob('Lead','insert');
+                var filesInput = document.getElementById("files");
+                filesInput.addEventListener("change", function(event) {
+                        var files = event.target.files; //FileList object
+                        var output = document.getElementById("result");
+                        var file = files[0];
+                        var picReader = new FileReader();
+                        picReader.onprogress = function(e, file) { 
+                            if (e.lengthComputable) {
+                                var percentage = Math.round((e.loaded * 100) / e.total);
+                                document.getElementById("status").innerHTML = 'Loaded : '+percentage+'%';
+                            }                                           
+                        }
+                        picReader.onloadend = function(e, file) { 
+                            if (e.lengthComputable) {
+                                var percentage = Math.round((e.loaded * 100) / e.total);
+                                document.getElementById("status").innerHTML = 'Loaded : '+percentage+'%';
+                            }                                           
+                        }
+                        picReader.onload = function(event){
+                            document.getElementById("status").innerHTML = 'Loaded : 100%';
+                            outfile=event.target.result;
+                            fileloaded=true; //chunkdata(event.target.result);
+                            }
+                        //Read the text file
+                        picReader.readAsText(file);
+                    });
+        }
+        else {
+                alert("Your browser does not support File API");
+        }
+
+    };
+    
+    var chunkdata = function(){
+        if(fileloaded){
+            cursor_wait();
+            var textFile=outfile;
+            var re=/\r\n|\n\r|\n|\r/g;
+            var textarray = textFile.replace(re,'\n').split('\n');
+            var header = textarray[0];
+            if(header.toUpperCase().search("LASTNAME") <0){
+                alert("File Header must contain Lastname");
+                cursor_clear();
+                return;
+            }
+            var arraysize =textarray.length;
+            var chunksize = Math.ceil(arraysize / MAXSIZE);
+            var filearray = [];
+            for(var ii=0;ii<chunksize;ii++){
+                var smdata=header+'\r\n';
+                for(var x=(ii)*MAXSIZE;x<(ii)*MAXSIZE+MAXSIZE;x++){
+                    if(typeof textarray[x] != 'undefined'  && x !=0){
+                        smdata+=textarray[x]+'\r\n';
+                    }
+                }
+                if(smdata.length >1){
+                    filearray.push(smdata);
+                }
+            }
+            Promise.all(
+                filearray.map(function(file) {
+                    var batch = job.createBatch();
+                    batch.execute(file);
+                    return new Promise(function(resolve, reject) {
+                        batch.on("queue", function(batchInfo) {
+                            batchId = batchInfo.id;
+                            var batch = job.batch(batchId);
+                            batch.on('response', function(res) { resolve(res); });
+                            batch.on('error', function(err) { reject(err); });
+                            batch.poll(3*1000, 60*1000);
+                        });
+                    });
+                })
+            )
+            .then(function(rets) {
+                  var successrec=0;
+                  var errorrec=0;
+                  var procrec=0;
+                  var errormsg='';
+                  for(var i=0;i<rets.length;i++){
+                    for(var ii=0;ii<rets[i].length;ii++){
+                        procrec++;
+                        if(rets[i][ii].success==true){
+                            successrec++;
+                        }else{
+                            errorrec++;
+                            if(errormsg.length==0){
+                                errormsg=rets[i][ii].errors[0];
+                            }else{
+                                errormsg='\n'+rets[i][ii].errors[0];
+                            }
+                        }
+                    }
+                    document.getElementById("loadresult").innerHTML = 'Processed : '+procrec+' with '+errorrec+' errors '+errormsg;
+                  }
+                  cursor_clear();
+                  job.close();
+                }, function(err) {
+                  alert(err);
+                  document.getElementById("loadresult").innerHTML = 'ERROR PROCESSING RECORDS: '+err;
+                  job.close();
+                });
+        }else{
+            alert('Select file to process.');
+        }
+    };
+    
+    function cursor_wait() {
+        document.body.style.cursor = 'wait';
+        elem = document.getElementById("statusmodal");
+        elem.style.visibility="visible";
+    }
+
+    // Returns the cursor to the default pointer
+    function cursor_clear() {
+        document.body.style.cursor = 'default';
+         elem = document.getElementById("statusmodal");
+        elem.style.visibility="hidden";
+    }
+    </script>
+   
+
+    
+             <apex:sectionHeader title="Bulk Lead Processor" subtitle=""/>
+             <apex:form > 
+                <apex:pageMessages />
+                     <div id="statusmodal" style="visibility:hidden">
+                        <div class="popupBackground" />
+                        <div class="PopupPanel">
+                            <table border="0" width="100%" height="100%">
+                                <tr><td align="center"><b>Please Wait</b></td></tr>
+                                <tr><td align="center"><img src="{!URLFOR($Resource.DemoAssets,'images/ProgressBar.gif')}"/></td></tr>
+                            </table>
+                        </div>
+                    </div>
+                    <apex:pageBlock title="Selct a file to process">
+                      
+                            <input type="file" id="files" name="files[]" multiple="multiple"  />
+                            <output id="result"></output>
+                            <output id="status"></output> <br/>
+                            <input type="button" value="Process File" onclick="chunkdata();" /><br/>
+                            <output id="loadresult"></output>
+                    </apex:pageBlock>
+             </apex:form> 
+      
+</apex:page>
