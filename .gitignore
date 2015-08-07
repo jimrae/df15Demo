@@ -1,3 +1,5 @@
 config/
 resource-bundles/
 *.sublime*
+src/profiles/
+src/objects/
