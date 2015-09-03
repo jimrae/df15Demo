@@ -44,7 +44,7 @@
     var outfile;
     var conn;
     var job;
-    var MAXSIZE = 5000;
+    var MAXSIZE = 5`000;
     window.onload = function() {
 
         if (window.File && window.FileList && window.FileReader) {

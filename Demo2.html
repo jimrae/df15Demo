@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+.myButton {
+  background-color:#44c767;
+  -moz-border-radius:28px;
+  -webkit-border-radius:28px;
+  border-radius:28px;
+  border:1px solid #18ab29;
+  display:inline-block;
+  cursor:pointer;
+  color:#ffffff;
+  font-family:Arial;
+  font-size:17px;
+  padding:16px 31px;
+  text-decoration:none;
+  text-shadow:0px 1px 0px #2f6627;
+}
+.myButton:hover {
+  background-color:#5cbf2a;
+}
+.myButton:active {
+  position:relative;
+  top:1px;
+}
+
+.container{
+   width:100%;
+ }
+
+html, body {
+        height: 100%;
+        margin: 0;
+        font-size=xxx-large;
+      }
+
+  #output{
+    min-height: 100%; 
+    width:100%;
+  }
+</style>
+  <script>
+  var bar = new Promise(function(resolve,reject){
+    setTimeout(function(){
+      resolve(2);
+    },15000)
+
+  });
+  var foo = function(){
+    bar.then(function(b){
+    var x=5;
+    var y=b;
+    var z = x+y;
+     document.getElementById('output').textContent =  z;
+     document.body.style.cursor = 'default';
+  });
+  }
+
+  var runMe= function(){
+    document.body.style.cursor = 'wait';
+   foo();
+    
+  }
+  </script>
+</head>
+<body>
+<div class="container">
+<center><div id="output" ></div></center></br>
+  <center><button class="myButton" onclick="runMe();">runMe</button></center>
+</div>
+</body>
+</html>
