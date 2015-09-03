@@ -43,10 +43,10 @@ html, body {
   <script>
   var bar = new Promise(function(resolve,reject){
     setTimeout(function(){
-      resolve(2);
+      var a = 2;
+      resolve(a);
     },15000)
-
-  });
+  })
   var foo = function(){
     bar.then(function(b){
     var x=5;
